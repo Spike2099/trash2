@@ -1,4 +1,4 @@
-
+//64 битный ключ с числами позиций сдвига
 int key[64] =
 {
     0, 0, 0, 1, 0, 0, 1, 1,
@@ -14,85 +14,107 @@ int key[64] =
 class Des
 {
 public:
-    int keyi[16][48],
+    int keyi[16][48],//второй 64 битный ключ
         total[64],
-        left[32],
-        right[32],
+        left[32],// Левая половина на 32 бита
+        right[32],//Правая половина на 32 бита
         ck[28],
         dk[28],
-        expansion[48],
-        z[48],
-        xor1[48],
+        expansion[48],//Расширение
+        z[48],//Массив для "Выбор перестановки - 2"
+        xor1[48],//Массив битов методом XOR
         sub[32],
         p[32],
-        xor2[32],
-        temp[64],
-        pc1[56],
-        ip[64],
+        xor2[32],//Массив битов методом XOR
+        temp[64],//Массив для swap 32-бит
+        pc1[56],//Подключ
+        ip[64],//Массив битов для перестановки
         inv[8][8];
 
     char final[1000000];
     void IP();
-    void PermChoice1();
-    void PermChoice2();
-    void Expansion();
+    void PermChoice1();//Первоначальная перестановка
+    void PermChoice2();//
+    void Expansion();//Функция расширения,Выполнение расширения `right [32] 'для получе-ния` expansion [48]'
     void inverse();
     void xor_two();
-    void xor_oneE(int);
-    void xor_oneD(int);
-    void substitution();
-    void permutation();
+    void xor_oneE(int);//Операция XOR подстановки производится на 48 битами для зашифровки
+    void xor_oneD(int);//Операция XOR подстановки производится на 48 битами для расшифровки
+    void substitution();//Выполнить подстановку на xor1 [48], чтобы по-лучить sub [32]
+    void permutation();//Перестановка
     void keygen();
     char *Encrypt(char *);
     char *Decrypt(char *);
 };
-void Des::IP() //Первоначальная перестановка
+void Des::IP() //Первоначальная перестановка до первого этапа,
+//перемещаем бит 58 в битовую позицию 1, бит 50 в битовую позицию 2, бит 42 в битовую позицию 3 и так далее.
 {
-    int k = 58, i;
-    for (i = 0; i<32; i++)
+    int k = 58;
+    for (int i = 0; i<32; i++)
     {
         ip[i] = total[k - 1];
-        if (k - 8>0)  k = k - 8;
-        else       k = k + 58;
+        if (k - 8>0)
+            k -= 8;
+        else
+            k += 58;
     }
     k = 57;
-    for (i = 32; i<64; i++)
+    for (int i = 32; i<64; i++)
     {
         ip[i] = total[k - 1];
-        if (k - 8>0)   k = k - 8;
-        else     k = k + 58;
+        if (k - 8>0)
+            k -= 8;
+        else
+            k += 58;
     }
 }
-void Des::PermChoice1()//Первоначальная перестановка
+
+//Сначала 64 битовый ключ Des уменьшится до 56-битового ключа путем отбрасыванием каждого воьсмого бита. Эти биты позволяют проверять правильность ключа.
+//После извлечения 56 битового ключа для каждого из 16(S-блоки) этапов Des генерирует новый 48 битовый подключ.
+//Во первых 56 битовый ключ делится на две 28-битовых половины.Затем половины циклически сдвигаются
+//налево на один или два бита в зависимости от этапа
+void Des::PermChoice1()//Первоначальная перестановка ключа
+
 {
-    int k = 57, i;
-    for (i = 0; i<28; i++)
+    int k = 57;
+    for (int i = 0; i<28; i++)
     {
         pc1[i] = key[k - 1];
-        if (k - 8>0)    k = k - 8;
-        else      k = k + 57;
+        if (k - 8>0)
+            k -= 8;
+        else
+            k += 57;
     }
     k = 63;
-    for (i = 28; i<52; i++)
+    for (int i = 28; i<52; i++)
     {
         pc1[i] = key[k - 1];
-        if (k - 8>0)    k = k - 8;
-        else         k = k + 55;
+        if (k - 8>0)
+            k -= 8;
+        else
+            k += 55;
     }
     k = 28;
-    for (i = 52; i<56; i++)
+    for (int i = 52; i<56; i++)
     {
         pc1[i] = key[k - 1];
-        k = k - 8;
+        k -= 8;
     }
 
 }
+//Эта операция расширяет правую половину данных Ri от 32 до 48 бит
+//Не просто повторяются биты но также меняется их порядок,эта операция называется перестановкой с расширением
+// 1-задача:привести размер правой половины в соотвествии с ключом для операции XOR
+// 2-задача:получить длинный результат,который можно будет сжать в ходе операции подстановки.
+// Возрастает потребность в битов результата от исходных.(Лавинный эффект)
+//еще его часто называют E-блоком
 void Des::Expansion()//Функция расширения, примененная на «пра-вой» половине
 {
-    int exp[8][6], i, j, k;
-    for (i = 0; i<8; i++)
+    int exp[8][6];
+    int k;
+    for (int i = 0; i<8; i++)
     {
-        for (j = 0; j<6; j++)
+        for (int j = 0; j<6; j++)
         {
             if ((j != 0) || (j != 5))
             {
@@ -115,21 +137,29 @@ void Des::Expansion()//Функция расширения, примененна
     exp[7][5] = right[0];
 
     k = 0;
-    for (i = 0; i<8; i++)
-    for (j = 0; j<6; j++)
+    for (int i = 0; i<8; i++)
+    for (int j = 0; j<6; j++)
         expansion[k++] = exp[i][j];
 }
+//После сдвига выбирается 48 из 56-битов.Выбираются не только подмножества битов,но и
+//изменяется их порядок это называется перестановка со сжатием(перестановка выбором).
+//Его результатом явлется набор из 48 битов. Например 33 перемещается в позицию 35 результата, а 18 бит сдвинутого ключа отбрасывается.
+//для каждого 4 битового входного блока первый и четвёртый представляют собой два бита выходного блока.
+//ниже будет приведён обмен на котором будут видны выходы.
 void Des::PermChoice2()// Выбор перестановки - 2
 {
-    int per[56], i, k;
-    for (i = 0; i<28; i++) per[i] = ck[i];
-    for (k = 0, i = 28; i<56; i++) per[i] = dk[k++];
+    //массив битов для перестановки
+    int per[56];
+    for (int i = 0; i<28; i++)
+        per[i] = ck[i];
+    for (int k = 0, i = 28; i<56; i++)
+        per[i] = dk[k++];
 
-    z[0] = per[13];
+    z[0] = per[13];//входной блок бит
     z[1] = per[16];
     z[2] = per[10];
     z[3] = per[23];
-    z[4] = per[0];
+    z[4] = per[0];//выходной блок бит и т.д.
     z[5] = per[4];
     z[6] = per[2];
     z[7] = per[27];
@@ -174,20 +204,23 @@ void Des::PermChoice2()// Выбор перестановки - 2
     z[46] = per[28];
     z[47] = per[31];
 }
-void Des::xor_oneE(int round) // Для Шифрования
+
+void Des::xor_oneE(int round)//Операция XOR подстановки производится на 48 битами для зашифровки
 {
-    int i;
-    for (i = 0; i<48; i++)
+
+    for (int i = 0; i<48; i++)
         xor1[i] = expansion[i] ^ keyi[round - 1][i];
 }
-void Des::xor_oneD(int round) // Для Расшифрования
+
+void Des::xor_oneD(int round)//Операция XOR подстановки производится на 48 битами для расшифровки
 {
-    int i;
-    for (i = 0; i<48; i++)
+    for (int i = 0; i<48; i++)
         xor1[i] = expansion[i] ^ keyi[16 - round][i];
 }
 
-void Des::substitution() // S-Блоки
+// Производится операция подстановки в 8 блоках или S-блоках.
+//У каждого S-блока 6 битовый вход и 4х-битовый выход для 8 блоков используется 256 байтов памяти.
+void Des::substitution() // S-Блоки замена
 {
     int s1[4][16] =
     {
@@ -253,22 +286,23 @@ void Des::substitution() // S-Блоки
         {2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11}
     };
 
-    int a[8][6], k = 0, i, j, p, q, count = 0, g = 0, v = 0;
+    int a[8][6];
+    int i = 0,k = 0, p, q, count = 0, g = 0, v = 0;
 
-    for (i = 0; i<8; i++)
+    for (int i = 0; i<8; i++)
     {
-        for (j = 0; j<6; j++)
+        for (int j = 0; j<6; j++)
         {
             a[i][j] = xor1[k++];
         }
     }
 
-    for (i = 0; i<8; i++)
+    for ( i = 0; i<8; i++)
     {
         p = 1;
         q = 0;
         k = (a[i][0] * 2) + (a[i][5] * 1);
-        j = 4;
+        int j = 4;
         while (j>0)
         {
             q = q + (a[i][j] * p);
@@ -359,8 +393,7 @@ void Des::permutation() //Перестановка
 //проделываем второй раз алгоритм xor
 void Des::xor_two()
 {
-    int i;
-    for (i = 0; i<32; i++)
+    for (int i = 0; i<32; i++)
     {
         xor2[i] = left[i] ^ p[i];
     }
@@ -368,12 +401,12 @@ void Des::xor_two()
 
 void Des::inverse()//инвертируем
 {
-    int p = 40, q = 8, k1, k2, i, j;
-    for (i = 0; i<8; i++)
+    int p = 40, q = 8, k1, k2;
+    for (int i = 0; i<8; i++)
     {
         k1 = p;
         k2 = q;
-        for (j = 0; j<8; j++)
+        for (int j = 0; j<8; j++)
         {
             if (j % 2 == 0)
             {
@@ -393,32 +426,41 @@ void Des::inverse()//инвертируем
 
 char * Des::Encrypt(char *Text1)
 {
-    int i, a1, j, nB, m, iB, k, K, B[8], n, t, d, round;
+    int a1, nB = 0, iB = 0, k, K, B[8], n, d, round;
     char *Text = new char[1000000];
     strcpy(Text, Text1);
-    i = strlen(Text);
+    size_t i = strlen(Text);
     int mc = 0;
     a1 = i % 8;
-    if (a1 != 0) for (j = 0; j<8 - a1; j++, i++) Text[i] = ' ';
+    if (a1 != 0)
+        for (int j = 0; j < 8 - a1; j++, i++)
+            Text[i] = ' ';
     Text[i] = '\0';
     keygen();
-    for (iB = 0, nB = 0, m = 0; m<(strlen(Text) / 8); m++) //Повторит для TextLenth / 8 раз.
+
+    for (int m = 0; m < (strlen(Text)/8); m++) //Повторит для TextLength / 8 раз.
     {
-        for (iB = 0, i = 0; i<8; i++, nB++)
+        for (int i = 0; i<8; i++)
         {
+            nB++;
             n = (int)Text[nB];
             for (K = 7; n >= 1; K--)
             {
                 B[K] = n % 2; //Преобразование 8-байтов в 64-битный двоич-ный формат
                 n /= 2;
             }
-            for (; K >= 0; K--) B[K] = 0;
-            for (K = 0; K<8; K++, iB++) total[iB] = B[K]; //Теперь total со-держит 64-битный двоичный формат 8-байтов
+            for (; K >= 0; K--)
+                B[K] = 0;
+            for (K = 0; K<8; K++, iB++)
+                total[iB] = B[K]; //Теперь total со-держит 64-битный двоичный формат 8-байтов
         }
         IP();  //Выполнение начальной перестановки на total [64]
-        for (i = 0; i<64; i++) total[i] = ip[i]; //Сохранить значения ip [64] в сумме [64]
+        for (int i = 0; i<64; i++)
 
-        for (i = 0; i<32; i++) left[i] = total[i]; //      +--> Влево [32]
+            total[i] = ip[i]; //Сохранить значения ip [64] в сумме [64]
+
+        for (int i = 0; i<32; i++)
+            left[i] = total[i]; //      +--> Влево [32]
         // total[64]--|
         for (; i<64; i++)
             right[i - 32] = total[i]; //            +--> Вправо [32]
@@ -429,19 +471,23 @@ char * Des::Encrypt(char *Text1)
             substitution();//Выполнить подстановку на xor1 [48], чтобы по-лучить sub [32]
             permutation(); //Выполняя перестановку на sub [32], чтобы по-лучить p [32]
             xor_two(); //Выполнение операции XOR слева [32], p [32] для получения xor2 [32]
-            for (i = 0; i<32; i++) left[i] = right[i]; //Сброс вправо [32] влево [32]
-            for (i = 0; i<32; i++) right[i] = xor2[i]; //Сброс xor2 [32] вправо [32]
+            for (i = 0; i<32; i++)
+                left[i] = right[i]; //Сброс вправо [32] влево [32]
+            for (i = 0; i<32; i++)
+                right[i] = xor2[i]; //Сброс xor2 [32] вправо [32]
         }
-        for (i = 0; i<32; i++) temp[i] = right[i]; // Сброс  -->[ swap32bit ]
-        for (; i<64; i++) temp[i] = left[i - 32]; //    left[32],right[32] в temp[64]
+        for (int i = 0; i<32; i++)
+            temp[i] = right[i]; // Сброс  -->[ swap32bit ]
+        for (; i<64; i++)
+            temp[i] = left[i - 32]; //    left[32],right[32] в temp[64]
 
         inverse(); //Инвертирование битов temp [64] для получения inv [8] [8]
         //Получение шифрованного текста в final[1000]
         k = 128;
         d = 0;
-        for (i = 0; i<8; i++)
+        for (int i = 0; i<8; i++)
         {
-            for (j = 0; j<8; j++)
+            for (int j = 0; j<8; j++)
             {
                 d = d + inv[i][j] * k;
                 k = k / 2;
@@ -456,33 +502,40 @@ char * Des::Encrypt(char *Text1)
 }
 char * Des::Decrypt(char *Text1)
 {
-    int i, j, nB, m, iB, k, K, B[8], n, d, round;
+    int i, j, nB = 0, m , k, K, B[8], n, d, round;
     char *Text = new char[1000];
     unsigned char ch;
     strcpy(Text, Text1);
     i = strlen(Text);
     keygen();
     int mc = 0;
-    for (iB = 0, nB = 0, m = 0; m <(strlen(Text) / 8); m++) //Повторение для TextLenth / 8 раз.
+    for (m = 0; m <(strlen(Text) / 8); m++) //Повторение для TextLenth / 8 раз.
     {
-        for (iB = 0, i = 0; i<8; i++, nB++)
+        for (int iB = 0, i = 0; i<8; i++)
         {
+            nB++;
             ch = Text[nB];
-            n = (int)ch;//(int)Text[nB];
+            n = (int)ch; //(int)Text[nB];
             for (K = 7; n >= 1; K--)
             {
                 B[K] = n % 2;  //Преобразование 8-байтов в 64-битный двоич-ный формат
                 n /= 2;
             }
             for (; K >= 0; K--) B[K] = 0;
-            for (K = 0; K<8; K++, iB++) total[iB] = B[K]; //Теперь `total 'со-держит 64-битный двоичный формат 8-байтов
+            for (K = 0; K<8; K++, iB++)
+                total[iB] = B[K]; //Теперь `total 'со-держит 64-битный двоичный формат 8-байтов
         }
         IP(); //Выполнение начальной перестановки на `total [64] '
-        for (i = 0; i<64; i++) total[i] = ip[i]; //Сохранить значения ip [64] в сумме [64]
+        for (i = 0; i<64; i++)
+            total[i] = ip[i]; //Сохранить значения ip [64] в сумме [64]
 
-        for (i = 0; i<32; i++) left[i] = total[i]; //     +--> Влево [32]
+        for (i = 0; i<32; i++)
+            left[i] = total[i]; // +--> Влево [32]
+
         // total[64]--|
-        for (; i<64; i++) right[i - 32] = total[i]; //            +--> Вправо [32]
+        for (; i<64; i++)
+            right[i - 32] = total[i]; // +--> Вправо [32]
+
         for (round = 1; round <= 16; round++)
         {
             Expansion(); //Выполнение расширения `right [32] 'для получе-ния` expansion [48]'
@@ -490,11 +543,16 @@ char * Des::Decrypt(char *Text1)
             substitution();//Выполнить подстановку на xor1 [48], чтобы по-лучить sub [32]
             permutation(); //Выполняя перестановку на sub [32], чтобы по-лучить p [32]
             xor_two(); //Выполнение операции XOR слева [32], p [32] для получения xor2 [32]
-            for (i = 0; i<32; i++) left[i] = right[i]; //Сброс right[32] в left[32]
-            for (i = 0; i<32; i++) right[i] = xor2[i]; //Сброс xor2[32] в right[32]
+            for (i = 0; i<32; i++)
+                left[i] = right[i]; //Сброс right[32] в left[32]
+            for (i = 0; i<32; i++)
+                right[i] = xor2[i]; //Сброс xor2[32] в right[32]
         } //раунд заканчивается здесь
-        for (i = 0; i<32; i++) temp[i] = right[i]; // Сброс  -->[ swap32bit ]
-        for (; i<64; i++) temp[i] = left[i - 32]; //    left[32],right[32] в temp[64]
+
+        for (i = 0; i<32; i++)
+            temp[i] = right[i]; // Сброс  -->[ swap32bit ]
+        for (; i<64; i++)
+            temp[i] = left[i - 32]; //    left[32],right[32] в temp[64]
 
         inverse(); //Инвертирование битов temp [64] для получения inv [8] [8]
         /** Получение шифрованного текста в окончательный [1000]*/
@@ -522,7 +580,6 @@ char * Des::Decrypt(char *Text1)
 void Des::keygen()
 {
     PermChoice1();
-
     int i, k = 0;
     for (i = 0; i<28; i++)
     {
