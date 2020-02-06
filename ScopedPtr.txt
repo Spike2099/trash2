@@ -4,7 +4,7 @@ struct BinaryOperation;
 
 struct ScopedPtr
 {
-    // реализуйте следующие методы:
+    
      explicit ScopedPtr(Expression *ptr = 0){
          this->ptr_=ptr;
      }
